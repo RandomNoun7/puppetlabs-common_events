@@ -12,13 +12,17 @@ class common_events (
 ) {
 
   # Account for the differences in Puppet Enterprise and open source
-  if $facts['common_events_is_pe'] {
+  if $facts[pe_server_version] != undef {
     $owner          = 'pe-puppet'
     $group          = 'pe-puppet'
+    $confdir        = '/etc/puppetlabs/puppet/common_events'
+    $modulepath     = '/etc/puppetlabs/code/environments/production/modules:/etc/puppetlabs/code/modules:/opt/puppetlabs/puppet/modules'
+    $statedir       = '/etc/puppetlabs/puppet/common_events/processors.d'
   }
   else {
-    $owner          = 'puppet'
-    $group          = 'puppet'
+    notify { 'Non-PE':
+      message => 'Error: This module is intended for use with Puppet Enterprise only.',
+    }
   }
 
   if (
@@ -36,33 +40,45 @@ class common_events (
 
   cron { 'collect_common_events':
     ensure  => 'present',
-    command => @("COMMAND"/L),
-      ${settings::confdir}/collect_api_events.rb \
-      ${settings::confdir} \
-      ${settings::modulepath} \
-      ${settings::statedir}
-      |-COMMAND
+    command => "${confdir}/collect_api_events.rb ${confdir} ${modulepath} ${statedir}",
     user    => 'root',
     minute  => '*/2',
     require => [
-      File["${settings::confdir}/collect_api_events.rb"],
-      File["${settings::confdir}/events_collection.yaml"]
+      File["${confdir}/collect_api_events.rb"],
+      File["${confdir}/events_collection.yaml"]
     ],
   }
 
-  file { "${settings::confdir}/events_collection.yaml":
+  file { $confdir:
+    ensure  => directory,
+    owner   => $owner,
+    group   => $group,
+    recurse => 'remote',
+    source  => 'puppet:///modules/common_events/lib',
+  }
+
+  file { "${confdir}/processors.d":
+    ensure  => directory,
+    owner   => $owner,
+    group   => $group,
+    require => File[$confdir],
+  }
+
+  file { "${confdir}/events_collection.yaml":
     ensure  => file,
     owner   => $owner,
     group   => $group,
     mode    => '0640',
+    require => File[$confdir],
     content => epp('common_events/events_collection.yaml'),
   }
 
-  file { "${settings::confdir}/collect_api_events.rb":
-    ensure => file,
-    owner  => $owner,
-    group  => $group,
-    mode   => '0755',
-    source => 'puppet:///modules/common_events/collect_api_events.rb',
+  file { "${confdir}/collect_api_events.rb":
+    ensure  => file,
+    owner   => $owner,
+    group   => $group,
+    mode    => '0755',
+    require => File[$confdir],
+    source  => 'puppet:///modules/common_events/collect_api_events.rb',
   }
 }
