@@ -18,6 +18,7 @@ class common_events (
     $confdir        = '/etc/puppetlabs/puppet/common_events'
     $modulepath     = '/etc/puppetlabs/code/environments/production/modules:/etc/puppetlabs/code/modules:/opt/puppetlabs/puppet/modules'
     $statedir       = '/etc/puppetlabs/puppet/common_events/processors.d'
+    include common_events::install
   }
   else {
     notify { 'Non-PE':
@@ -36,49 +37,5 @@ class common_events (
     token in the 'pe_token' parameter
     |-MESSAGE
     fail($authorization_failure_message)
-  }
-
-  cron { 'collect_common_events':
-    ensure  => 'present',
-    command => "${confdir}/collect_api_events.rb ${confdir} ${modulepath} ${statedir}",
-    user    => 'root',
-    minute  => '*/2',
-    require => [
-      File["${confdir}/collect_api_events.rb"],
-      File["${confdir}/events_collection.yaml"]
-    ],
-  }
-
-  file { $confdir:
-    ensure  => directory,
-    owner   => $owner,
-    group   => $group,
-    recurse => 'remote',
-    source  => 'puppet:///modules/common_events/lib',
-  }
-
-  file { "${confdir}/processors.d":
-    ensure  => directory,
-    owner   => $owner,
-    group   => $group,
-    require => File[$confdir],
-  }
-
-  file { "${confdir}/events_collection.yaml":
-    ensure  => file,
-    owner   => $owner,
-    group   => $group,
-    mode    => '0640',
-    require => File[$confdir],
-    content => epp('common_events/events_collection.yaml'),
-  }
-
-  file { "${confdir}/collect_api_events.rb":
-    ensure  => file,
-    owner   => $owner,
-    group   => $group,
-    mode    => '0755',
-    require => File[$confdir],
-    source  => 'puppet:///modules/common_events/collect_api_events.rb',
   }
 }
